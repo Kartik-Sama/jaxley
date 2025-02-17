@@ -64,6 +64,7 @@ def _split_branch_equally(branch: np.ndarray, num_subbranches: int) -> List[np.n
     return branches
 
 
+
 def _split_into_branches(
     content: np.ndarray, is_single_point_soma: bool
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -73,49 +74,54 @@ def _split_into_branches(
 
     # Branch inds will contain the row identifier at which a branch point occurs
     # (i.e. the row of the parent of two branches).
-    branch_inds = []
+    branch_parent_inds = set()
     for c in content:
         current_ind = c[0]
         current_parent = c[-1]
         current_type = c[1]
         if current_parent != prev_ind or current_type != prev_type:
-            branch_inds.append(int(current_parent))
+            branch_parent_inds.add(int(current_parent))
             n_branches += 1
         prev_ind = current_ind
         prev_type = current_type
-
+    print(branch_parent_inds)
     all_branches = []
     current_branch = []
     all_types = []
+    current_branch_type = None
 
     # Loop over every line in the SWC file.
     for c in content:
-        current_ind = c[0]  # First col is row_identifier
         current_parent = c[-1]  # Last col is parent in SWC specification.
+        current_ind = c[0]  # First col is row_identifier
+        current_node_type = c[1]
+
         if current_parent == -1:
-            all_types.append(c[1])
-        else:
-            current_type = c[1]
+            current_branch = [int(current_ind)]
+            current_branch_type = current_node_type
+            continue
 
-        if current_parent == -1 and is_single_point_soma and current_ind == 1:
-            all_branches.append([int(current_ind)])
-            all_types.append(int(current_type))
-
-        # Either append the current point to the branch, or add the branch to
-        # `all_branches`.
-        if current_parent in branch_inds[1:]:
-            if len(current_branch) > 1:
+        if current_parent in branch_parent_inds:  # New branch starting
+            # If it's the first branch then just check if the branch is non empty
+            # Else check if parent of a branch is always added to the branch by it's size
+            if (not all_branches and current_branch) or len(current_branch) > 1:
+                # Current branch ended so log it
                 all_branches.append(current_branch)
-                all_types.append(current_type)
+                all_types.append(int(current_branch_type))
+            # Collect details of new branch
             current_branch = [int(current_parent), int(current_ind)]
+            current_branch_type = current_node_type
         else:
+            # Extension of current branch
+            assert (
+                current_branch_type == current_node_type
+            ), f"Type of node changed within the same branch - {current_branch_type}; node_type - {current_node_type}"
             current_branch.append(int(current_ind))
 
-    # Append the final branch (intermediate branches are already appended five lines
-    # above.)
+    # Append the final branch and it's type
     all_branches.append(current_branch)
+    all_types.append(int(current_branch_type))
     return all_branches, all_types
-
 
 def _split_into_branches_and_sort(
     content: np.ndarray,

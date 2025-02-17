@@ -75,7 +75,7 @@ def _split_into_branches(
     # Branch inds will contain the row identifier at which a branch point occurs
     # (i.e. the row of the parent of two branches).
     branch_parent_inds = set()
-    for c in content:
+    for c in content[1:]:
         current_ind = c[0]
         current_parent = c[-1]
         current_type = c[1]
@@ -96,26 +96,22 @@ def _split_into_branches(
         current_ind = c[0]  # First col is row_identifier
         current_node_type = c[1]
 
-        if current_parent == -1:
-            current_branch = [int(current_ind)]
-            current_branch_type = current_node_type
-            continue
+        if current_parent == -1 and is_single_point_soma and current_ind == 1:
+            all_branches.append([int(current_ind)])
+            all_types.append(int(current_type))
 
         if current_parent in branch_parent_inds:  # New branch starting
             # If it's the first branch then just check if the branch is non empty
             # Else check if parent of a branch is always added to the branch by it's size
-            if (not all_branches and current_branch) or len(current_branch) > 1:
+            if len(current_branch) > 1:
                 # Current branch ended so log it
                 all_branches.append(current_branch)
-                all_types.append(int(current_branch_type))
-            # Collect details of new branch
+                all_types.append(current_branch_type)
+            # Collect details of new branch 
             current_branch = [int(current_parent), int(current_ind)]
             current_branch_type = current_node_type
         else:
             # Extension of current branch
-            assert (
-                current_branch_type == current_node_type
-            ), f"Type of node changed within the same branch - {current_branch_type}; node_type - {current_node_type}"
             current_branch.append(int(current_ind))
 
     # Append the final branch and it's type
